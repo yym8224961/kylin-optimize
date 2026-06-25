@@ -1,0 +1,11 @@
+# 大型安装包
+*.deb
+*.AppImage
+*.tar.gz
+*.tar.xz
+
+# codex 项目（单独管理）
+codex-desktop-linux/
+
+# reasonix 配置
+reasonix.toml

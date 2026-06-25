@@ -1,0 +1,10 @@
+[Desktop Entry]
+Type=Application
+Name=KWin 性能优化
+Comment=禁用不必要特效以提升 UI 帧率
+Exec=bash /home/kylin/桌面/kwin-optimize.sh
+Icon=preferences-system-performance
+Terminal=false
+Categories=Settings;
+X-GNOME-Autostart-Phase=Initialization
+X-UKUI-Autostart-Phase=Initialization
