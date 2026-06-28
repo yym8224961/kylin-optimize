@@ -4,6 +4,13 @@
 *.tar.gz
 *.tar.xz
 
+# Python 缓存
+__pycache__/
+*.pyc
+
+# Codex 实施记录
+docs/superpowers/
+
 # codex 项目（单独管理）
 codex-desktop-linux/
 
