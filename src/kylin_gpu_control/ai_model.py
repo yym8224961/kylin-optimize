@@ -1,5 +1,6 @@
 import os
 import signal
+import shutil
 import subprocess
 import time
 from pathlib import Path
@@ -21,6 +22,13 @@ AUTOSTART_PROCESS_PATTERNS = (
     "kylin-ai-runtime",
 )
 AUTOSTART_PROCESS_NAMES = AUTOSTART_PROCESS_PATTERNS
+AUTOSTART_OVERRIDE_MARKER = "X-KylinGpuControl-Managed=true"
+AUTOSTART_BACKUP_SUFFIX = ".kylin-gpu-control.bak"
+KYLIN_AI_TRITON_HINTS = (
+    "/usr/share/kylin-ai",
+    "/usr/share/kylin-ai-python-env",
+    "--model-repository=/usr/share/kylin-ai/model-repository",
+)
 
 
 def user_service_command(action):
@@ -51,8 +59,18 @@ def write_autostart_overrides(home=None):
     written = []
     for name in AUTOSTART_DESKTOP_FILES:
         path = autostart_dir / name
+        backup = _autostart_backup_path(path)
+        if path.exists() and not _is_tool_owned_override(path) and not backup.exists():
+            shutil.copy2(path, backup)
         display_name = "TritonServer" if name == "tritonserver.desktop" else "Kylin AI Runtime"
-        path.write_text(f"[Desktop Entry]\nType=Application\nName={display_name}\nHidden=true\n", encoding="utf-8")
+        path.write_text(
+            "[Desktop Entry]\n"
+            "Type=Application\n"
+            f"Name={display_name}\n"
+            "Hidden=true\n"
+            f"{AUTOSTART_OVERRIDE_MARKER}\n",
+            encoding="utf-8",
+        )
         written.append(path)
     return written
 
@@ -62,7 +80,13 @@ def remove_autostart_overrides(home=None):
     removed = []
     for name in AUTOSTART_DESKTOP_FILES:
         path = home / ".config" / "autostart" / name
-        if path.exists():
+        backup = _autostart_backup_path(path)
+        if path.exists() and not _is_tool_owned_override(path):
+            continue
+        if backup.exists():
+            backup.replace(path)
+            removed.append(path)
+        elif path.exists():
             path.unlink()
             removed.append(path)
     return removed
@@ -144,7 +168,7 @@ def _autostart_process_pids(uid=None, proc_root=Path("/proc")):
             cmdline = (entry / "cmdline").read_bytes().replace(b"\0", b" ").decode("utf-8", "ignore")
         except OSError:
             continue
-        if comm in AUTOSTART_PROCESS_NAMES or _cmdline_has_process_name(cmdline):
+        if _is_kylin_ai_autostart_process(comm, cmdline):
             pids.append(pid)
     return pids
 
@@ -158,9 +182,29 @@ def _status_has_uid(status, uid):
     return False
 
 
-def _cmdline_has_process_name(cmdline):
+def _cmdline_process_names(cmdline):
     parts = [Path(part).name for part in cmdline.split() if part]
-    return any(name in parts for name in AUTOSTART_PROCESS_NAMES)
+    return parts
+
+
+def _is_kylin_ai_autostart_process(comm, cmdline):
+    names = [comm, *_cmdline_process_names(cmdline)]
+    if "kylin-ai-runtime" in names:
+        return True
+    if "tritonserver" not in names:
+        return False
+    return any(hint in cmdline for hint in KYLIN_AI_TRITON_HINTS)
+
+
+def _autostart_backup_path(path):
+    return path.with_name(f"{path.name}{AUTOSTART_BACKUP_SUFFIX}")
+
+
+def _is_tool_owned_override(path):
+    try:
+        return AUTOSTART_OVERRIDE_MARKER in path.read_text(encoding="utf-8", errors="ignore")
+    except OSError:
+        return False
 
 
 def _systemctl_value(action, service):

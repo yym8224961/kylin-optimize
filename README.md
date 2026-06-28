@@ -96,7 +96,7 @@ sudo ./install-gpu-control.sh
 
 “后台降噪”会尝试对 Kylin AI、KMRE、华为电脑管家、更新与搜索等当前用户后台进程降低 CPU/IO 优先级。失败项会被忽略，不会终止进程。
 
-“麒麟 AI 精简”会停止并禁用当前用户的 Kylin AI 文档问答服务、文档服务、Milvus Lite，并通过 `~/.config/autostart/` 覆盖 Triton Server 与 Kylin AI Runtime 自启。该操作不卸载软件包，不删除 `/usr/share/kylin-ai` 模型，也不删除 `~/.local/share/milvus-lite` 数据；点击“恢复 Kylin AI”可恢复用户服务和登录自启。当前 UKUI 会话可能会复活已经注册的 Kylin AI Runtime，重新登录后精简状态会完全生效。
+“麒麟 AI 精简”会停止并禁用当前用户的 Kylin AI 文档问答服务、文档服务、Milvus Lite，并通过 `~/.config/autostart/` 覆盖 Triton Server 与 Kylin AI Runtime 自启。若用户已有同名 autostart 自定义文件，工具会先保留备份，恢复时还原原文件。该操作不卸载软件包，不删除 `/usr/share/kylin-ai` 模型，也不删除 `~/.local/share/milvus-lite` 数据；点击“恢复 Kylin AI”可恢复用户服务和登录自启。当前 UKUI 会话可能会复活已经注册的 Kylin AI Runtime，重新登录后精简状态会完全生效。
 
 期望看到类似输出：
 

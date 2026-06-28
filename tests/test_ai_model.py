@@ -45,6 +45,36 @@ class KylinAiModelTests(unittest.TestCase):
             self.assertFalse((home / ".config/autostart/tritonserver.desktop").exists())
             self.assertFalse((home / ".config/autostart/kylin-ai-runtime.desktop").exists())
 
+    def test_autostart_override_restore_preserves_existing_user_file(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            autostart = home / ".config" / "autostart"
+            autostart.mkdir(parents=True)
+            user_file = autostart / "tritonserver.desktop"
+            original = "[Desktop Entry]\nType=Application\nName=Custom Triton\nHidden=false\n"
+            user_file.write_text(original, encoding="utf-8")
+
+            ai_model.write_autostart_overrides(home)
+            self.assertIn("Hidden=true", user_file.read_text(encoding="utf-8"))
+
+            ai_model.remove_autostart_overrides(home)
+
+            self.assertEqual(user_file.read_text(encoding="utf-8"), original)
+
+    def test_autostart_override_removal_leaves_user_owned_file_untouched(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            home = Path(tmp)
+            autostart = home / ".config" / "autostart"
+            autostart.mkdir(parents=True)
+            user_file = autostart / "kylin-ai-runtime.desktop"
+            original = "[Desktop Entry]\nType=Application\nName=User Runtime\nHidden=true\n"
+            user_file.write_text(original, encoding="utf-8")
+
+            removed = ai_model.remove_autostart_overrides(home)
+
+            self.assertEqual(removed, [])
+            self.assertEqual(user_file.read_text(encoding="utf-8"), original)
+
     def test_session_env_points_to_user_bus(self):
         env = ai_model.session_env(uid=1000)
 
@@ -59,6 +89,36 @@ class KylinAiModelTests(unittest.TestCase):
 
     def test_autostart_process_names_are_exact_process_targets(self):
         self.assertEqual(ai_model.AUTOSTART_PROCESS_NAMES, ("tritonserver", "kylin-ai-runtime"))
+
+    def test_process_filter_matches_kylin_ai_triton_but_not_user_triton(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            proc = Path(tmp)
+            self._write_proc_entry(
+                proc,
+                101,
+                "tritonserver",
+                ["/home/kylin/bin/tritonserver", "--model-repository=/home/kylin/models"],
+            )
+            self._write_proc_entry(
+                proc,
+                102,
+                "bash",
+                [
+                    "/bin/bash",
+                    "-c",
+                    "source /usr/share/kylin-ai-python-env/python-env/bin/activate && "
+                    "tritonserver --model-repository=/usr/share/kylin-ai/model-repository",
+                ],
+            )
+
+            self.assertEqual(ai_model._autostart_process_pids(uid=1000, proc_root=proc), [102])
+
+    def _write_proc_entry(self, proc, pid, comm, argv):
+        entry = proc / str(pid)
+        entry.mkdir()
+        (entry / "status").write_text("Name:\ttest\nUid:\t1000\t1000\t1000\t1000\n", encoding="utf-8")
+        (entry / "comm").write_text(f"{comm}\n", encoding="utf-8")
+        (entry / "cmdline").write_bytes(b"\0".join(arg.encode("utf-8") for arg in argv) + b"\0")
 
 
 if __name__ == "__main__":
