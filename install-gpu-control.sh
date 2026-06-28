@@ -15,9 +15,11 @@ fi
 
 install -d -m 0755 "$LIB_DIR" "$BIN_DIR" "$APP_DIR" "$ICON_DIR" "$POLKIT_DIR"
 
+install -m 0644 "$ROOT_DIR/src/kylin_gpu_control/ai_model.py" "$LIB_DIR/ai_model.py"
 install -m 0644 "$ROOT_DIR/src/kylin_gpu_control/app_catalog.py" "$LIB_DIR/app_catalog.py"
 install -m 0644 "$ROOT_DIR/src/kylin_gpu_control/drirc_model.py" "$LIB_DIR/drirc_model.py"
 install -m 0644 "$ROOT_DIR/src/kylin_gpu_control/kwin_model.py" "$LIB_DIR/kwin_model.py"
+install -m 0644 "$ROOT_DIR/src/kylin_gpu_control/perf_model.py" "$LIB_DIR/perf_model.py"
 install -m 0755 "$ROOT_DIR/src/kylin_gpu_control/kylin_gpu_control.py" "$LIB_DIR/kylin_gpu_control.py"
 install -m 0755 "$ROOT_DIR/src/kylin_gpu_control/kylin_gpu_control_apply.py" "$LIB_DIR/kylin_gpu_control_apply.py"
 
