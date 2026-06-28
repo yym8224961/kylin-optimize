@@ -87,6 +87,8 @@ class PackagingAssetTests(unittest.TestCase):
             "kylin-gpu-control-$VERSION.tar.gz",
             "COPYFILE_DISABLE",
             "--no-xattrs",
+            "__pycache__",
+            "*.pyc",
         ]:
             with self.subTest(expected=expected):
                 self.assertIn(expected, text)

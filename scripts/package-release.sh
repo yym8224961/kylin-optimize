@@ -42,6 +42,9 @@ do
     copy_path "$path"
 done
 
+find "$PACKAGE_DIR" -type d -name __pycache__ -prune -exec rm -rf {} +
+find "$PACKAGE_DIR" -type f -name "*.pyc" -delete
+
 rm -f "$ARCHIVE" "$ARCHIVE.sha256"
 (cd "$WORK_DIR" && COPYFILE_DISABLE=1 tar --no-xattrs -czf "$ARCHIVE" "$PACKAGE_NAME")
 
