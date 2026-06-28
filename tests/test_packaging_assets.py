@@ -49,6 +49,7 @@ class PackagingAssetTests(unittest.TestCase):
             "麒麟 GPU 兼容控制器",
             "GLX 状态",
             "桌面优化",
+            "屏幕刷新率",
             "已安装应用",
             "Zink 白名单",
             "通过 Zink 启动",
@@ -59,6 +60,36 @@ class PackagingAssetTests(unittest.TestCase):
         for legacy in ["GLX Status", "Run glxinfo -B", "Remove Selected", "Launch via Zink"]:
             with self.subTest(legacy=legacy):
                 self.assertNotIn(legacy, text)
+
+    def test_repository_declares_gpl_license(self):
+        license_text = (ROOT / "LICENSE").read_text(encoding="utf-8")
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("GNU GENERAL PUBLIC LICENSE", license_text)
+        self.assertIn("Version 3", license_text)
+        self.assertIn("GPL-3.0-or-later", readme)
+
+    def test_readme_lists_refresh_rate_dependency(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        self.assertIn("| 依赖 | Python 3、PyQt5、mesa-utils、policykit、kscreen-doctor |", readme)
+
+    def test_release_packaging_script_includes_gui_controller_assets(self):
+        text = (ROOT / "scripts" / "package-release.sh").read_text(encoding="utf-8")
+
+        for expected in [
+            "LICENSE",
+            "README.md",
+            "install-gpu-control.sh",
+            "src/kylin_gpu_control",
+            "packaging",
+            "kylin-gpu-control",
+            "kylin-gpu-control-$VERSION.tar.gz",
+            "COPYFILE_DISABLE",
+            "--no-xattrs",
+        ]:
+            with self.subTest(expected=expected):
+                self.assertIn(expected, text)
 
 
 if __name__ == "__main__":

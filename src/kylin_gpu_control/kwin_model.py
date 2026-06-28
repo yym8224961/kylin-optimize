@@ -1,4 +1,5 @@
 import configparser
+import json
 import os
 import re
 import shutil
@@ -97,6 +98,49 @@ class KWinConfigSummary:
     managed_plugins: int
 
 
+@dataclass(frozen=True)
+class DisplayMode:
+    id: str
+    name: str
+    width: int
+    height: int
+    refresh_rate: int
+
+
+@dataclass(frozen=True)
+class DisplayOutput:
+    id: int
+    name: str
+    enabled: bool
+    primary: bool
+    current_mode_id: str
+    modes: tuple
+
+    @property
+    def current_mode(self):
+        for mode in self.modes:
+            if mode.id == self.current_mode_id:
+                return mode
+        return None
+
+    def same_resolution_modes(self):
+        current = self.current_mode
+        if current is None:
+            return ()
+        return tuple(
+            mode
+            for mode in self.modes
+            if mode.width == current.width and mode.height == current.height
+        )
+
+    def find_refresh_mode(self, refresh_rate):
+        target = int(refresh_rate)
+        for mode in self.same_resolution_modes():
+            if int(round(mode.refresh_rate)) == target:
+                return mode
+        return None
+
+
 def parse_active_effects(dbus_output):
     return re.findall(r'string "([^"]+)"', dbus_output or "")
 
@@ -153,6 +197,124 @@ def summarize_kwinrc(text):
         disabled_managed_plugins=disabled,
         managed_plugins=len(PLUGIN_KEYS_TO_DISABLE),
     )
+
+
+def parse_kscreen_json(text):
+    payload = json.loads(text or "{}")
+    displays = []
+    for output in payload.get("outputs", []):
+        modes = []
+        for raw_mode in output.get("modes", []):
+            size = raw_mode.get("size", {})
+            modes.append(
+                DisplayMode(
+                    id=str(raw_mode.get("id", "")),
+                    name=raw_mode.get("name", ""),
+                    width=int(size.get("width", 0)),
+                    height=int(size.get("height", 0)),
+                    refresh_rate=int(round(float(raw_mode.get("refreshRate", 0)))),
+                )
+            )
+        displays.append(
+            DisplayOutput(
+                id=int(output.get("id", 0)),
+                name=output.get("name") or output.get("metadata", {}).get("name", ""),
+                enabled=bool(output.get("enabled")),
+                primary=bool(output.get("primary")),
+                current_mode_id=str(output.get("currentModeId", "")),
+                modes=tuple(modes),
+            )
+        )
+    return displays
+
+
+def kscreen_mode_command(display, mode):
+    return ["kscreen-doctor", f"output.{display.name}.mode.{mode.id}"]
+
+
+def current_displays():
+    result = subprocess.run(
+        ["kscreen-doctor", "-j"],
+        env=_session_env(),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=8,
+        check=True,
+    )
+    return parse_kscreen_json(result.stdout)
+
+
+def primary_display(displays=None):
+    displays = tuple(displays if displays is not None else current_displays())
+    for display in displays:
+        if display.enabled and display.primary:
+            return display
+    for display in displays:
+        if display.enabled:
+            return display
+    return None
+
+
+def set_kwinrc_refresh_rate_text(text, output_name, refresh_rate):
+    parser = _read_config(text)
+    for section in parser.sections():
+        if parser.get(section, "Name", fallback="") != output_name:
+            continue
+        mode = parser.get(section, "Mode", fallback="")
+        updated_mode = _mode_with_refresh(mode, refresh_rate)
+        if updated_mode:
+            parser[section]["Mode"] = updated_mode
+    return _write_config(parser)
+
+
+def set_kwinrc_refresh_rate_file(output_name, refresh_rate, path=KWIN_CONFIG):
+    path = Path(path)
+    current = path.read_text(encoding="utf-8") if path.exists() else ""
+    updated = set_kwinrc_refresh_rate_text(current, output_name, refresh_rate)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    backup = None
+    if path.exists():
+        backup = path.with_name(path.name + ".bak." + time.strftime("%Y%m%d%H%M%S"))
+        shutil.copy2(path, backup)
+    path.write_text(updated, encoding="utf-8")
+    return backup
+
+
+def set_display_refresh_rate(refresh_rate, path=KWIN_CONFIG):
+    display = primary_display()
+    if display is None:
+        raise RuntimeError("未找到已启用的显示器。")
+    mode = display.find_refresh_mode(refresh_rate)
+    if mode is None:
+        raise RuntimeError(f"{display.name} 当前分辨率不支持 {refresh_rate}Hz。")
+    subprocess.run(
+        kscreen_mode_command(display, mode),
+        env=_session_env(),
+        text=True,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.PIPE,
+        timeout=12,
+        check=True,
+    )
+    backup = set_kwinrc_refresh_rate_file(display.name, refresh_rate, path)
+    reconfigure_kwin()
+    return backup
+
+
+def refresh_status_text():
+    try:
+        display = primary_display()
+    except Exception as exc:
+        return f"刷新率状态读取失败：{exc}"
+    if display is None:
+        return "未找到已启用的显示器。"
+
+    current = display.current_mode
+    if current is None:
+        return f"{display.name}：当前模式未知。"
+    rates = ", ".join(f"{mode.refresh_rate}Hz" for mode in display.same_resolution_modes())
+    return f"{display.name}：当前 {current.name}，同分辨率可选：{rates or '未知'}"
 
 
 def optimize_kwinrc_file(path=KWIN_CONFIG):
@@ -236,6 +398,13 @@ def desktop_status_text(path=KWIN_CONFIG):
     return "\n".join(lines)
 
 
+def _mode_with_refresh(mode, refresh_rate):
+    match = re.fullmatch(r"(\d+x\d+)_\d+", mode or "")
+    if not match:
+        return ""
+    return f"{match.group(1)}_{int(refresh_rate) * 1000}"
+
+
 def _read_config(text):
     parser = configparser.ConfigParser(interpolation=None, strict=False)
     parser.optionxform = str
@@ -277,6 +446,8 @@ def _dbus_send(*args, check=True):
 def _session_env():
     env = os.environ.copy()
     uid = os.getuid()
+    if env.get("QT_QPA_PLATFORM") == "offscreen":
+        env.pop("QT_QPA_PLATFORM", None)
     env.setdefault("DISPLAY", ":0")
     env.setdefault("XDG_RUNTIME_DIR", f"/run/user/{uid}")
     env.setdefault("DBUS_SESSION_BUS_ADDRESS", f"unix:path=/run/user/{uid}/bus")

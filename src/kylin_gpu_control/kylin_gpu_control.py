@@ -87,6 +87,22 @@ class MainWindow(QMainWindow):
         desktop_buttons.addStretch(1)
         desktop_layout.addLayout(desktop_buttons)
 
+        refresh_box = QGroupBox("屏幕刷新率")
+        refresh_layout = QVBoxLayout(refresh_box)
+        self.refresh_rate_label = QLabel("")
+        self.refresh_rate_label.setWordWrap(True)
+        refresh_layout.addWidget(self.refresh_rate_label)
+
+        refresh_buttons = QHBoxLayout()
+        self.refresh_rate_refresh_button = QPushButton("刷新刷新率状态")
+        self.refresh_rate_120_button = QPushButton("切换到 120Hz")
+        self.refresh_rate_60_button = QPushButton("切换回 60Hz")
+        refresh_buttons.addWidget(self.refresh_rate_refresh_button)
+        refresh_buttons.addWidget(self.refresh_rate_120_button)
+        refresh_buttons.addWidget(self.refresh_rate_60_button)
+        refresh_buttons.addStretch(1)
+        refresh_layout.addLayout(refresh_buttons)
+
         app_box = QGroupBox("已安装应用")
         app_layout = QGridLayout(app_box)
         app_layout.addWidget(QLabel("搜索："), 0, 0)
@@ -136,6 +152,7 @@ class MainWindow(QMainWindow):
 
         layout.addWidget(status_box, 2)
         layout.addWidget(desktop_box, 1)
+        layout.addWidget(refresh_box, 1)
         layout.addWidget(app_box, 3)
         layout.addWidget(whitelist_box, 1)
         self.setCentralWidget(root)
@@ -145,6 +162,9 @@ class MainWindow(QMainWindow):
         self.desktop_refresh_button.clicked.connect(self.refresh_desktop_status)
         self.desktop_apply_button.clicked.connect(self.apply_desktop_optimization)
         self.desktop_reconfigure_button.clicked.connect(self.reconfigure_kwin)
+        self.refresh_rate_refresh_button.clicked.connect(self.refresh_screen_status)
+        self.refresh_rate_120_button.clicked.connect(lambda: self.set_screen_refresh_rate(120))
+        self.refresh_rate_60_button.clicked.connect(lambda: self.set_screen_refresh_rate(60))
         self.reload_apps_button.clicked.connect(self.refresh_app_catalog)
         self.use_app_button.clicked.connect(self.use_selected_app)
         self.add_app_button.clicked.connect(self.add_selected_app)
@@ -162,6 +182,7 @@ class MainWindow(QMainWindow):
         self.refresh_whitelist()
         self.refresh_vendor_label()
         self.refresh_desktop_status()
+        self.refresh_screen_status()
         self.run_glx_probe()
 
     def refresh_app_catalog(self):
@@ -250,6 +271,22 @@ class MainWindow(QMainWindow):
         except Exception as exc:
             QMessageBox.critical(self, "KWin 重载失败", str(exc))
             return
+        self.refresh_desktop_status()
+
+    def refresh_screen_status(self):
+        self.refresh_rate_label.setText(kwin_model.refresh_status_text())
+
+    def set_screen_refresh_rate(self, refresh_rate):
+        try:
+            backup = kwin_model.set_display_refresh_rate(refresh_rate)
+        except Exception as exc:
+            QMessageBox.critical(self, "刷新率切换失败", str(exc))
+            return
+        message = f"已切换到 {refresh_rate}Hz。"
+        if backup:
+            message += f"\n已备份原配置：{backup}"
+        QMessageBox.information(self, "屏幕刷新率", message)
+        self.refresh_screen_status()
         self.refresh_desktop_status()
 
     def run_glx_probe(self):
