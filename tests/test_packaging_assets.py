@@ -28,11 +28,19 @@ class PackagingAssetTests(unittest.TestCase):
             "kwin_model.py",
             "kylin_gpu_control.py",
             "kylin_gpu_control_apply.py",
+            "kylin-zink-run",
             "kylin-gpu-control.svg",
             "desktop-file-validate",
         ]:
             with self.subTest(expected=expected):
                 self.assertIn(expected, text)
+
+    def test_zink_launcher_asset_exists(self):
+        text = (ROOT / "packaging" / "kylin-zink-run").read_text(encoding="utf-8")
+
+        self.assertIn("MESA_LOADER_DRIVER_OVERRIDE", text)
+        self.assertIn("VK_ICD_FILENAMES", text)
+        self.assertIn("/usr/lib/aarch64-linux-gnu/maleoon", text)
 
     def test_gui_source_uses_chinese_primary_labels(self):
         text = (ROOT / "src" / "kylin_gpu_control" / "kylin_gpu_control.py").read_text(encoding="utf-8")

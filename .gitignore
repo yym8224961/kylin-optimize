@@ -11,6 +11,9 @@ __pycache__/
 # Codex 实施记录
 docs/superpowers/
 
+# Release artifacts
+dist/
+
 # codex 项目（单独管理）
 codex-desktop-linux/
 

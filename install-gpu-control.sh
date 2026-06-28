@@ -22,6 +22,7 @@ install -m 0755 "$ROOT_DIR/src/kylin_gpu_control/kylin_gpu_control.py" "$LIB_DIR
 install -m 0755 "$ROOT_DIR/src/kylin_gpu_control/kylin_gpu_control_apply.py" "$LIB_DIR/kylin_gpu_control_apply.py"
 
 install -m 0755 "$ROOT_DIR/packaging/kylin-gpu-control" "$BIN_DIR/kylin-gpu-control"
+install -m 0755 "$ROOT_DIR/packaging/kylin-zink-run" "$BIN_DIR/kylin-zink-run"
 install -m 0644 "$ROOT_DIR/packaging/kylin-gpu-control.desktop" "$APP_DIR/kylin-gpu-control.desktop"
 install -m 0644 "$ROOT_DIR/packaging/kylin-gpu-control.svg" "$ICON_DIR/kylin-gpu-control.svg"
 install -m 0644 "$ROOT_DIR/packaging/org.kylin.gpu-control.policy" "$POLKIT_DIR/org.kylin.gpu-control.policy"

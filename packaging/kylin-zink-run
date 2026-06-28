@@ -1,0 +1,12 @@
+#!/bin/sh
+# Run one GLX/OpenGL program through the Kylin/Maleoon Zink compatibility path.
+if [ "$#" -eq 0 ]; then
+    echo "Usage: kylin-zink-run <command> [args...]" >&2
+    exit 64
+fi
+
+export LD_LIBRARY_PATH="/usr/lib/aarch64-linux-gnu/maleoon${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}"
+export MESA_LOADER_DRIVER_OVERRIDE="${MESA_LOADER_DRIVER_OVERRIDE:-zink}"
+export VK_ICD_FILENAMES="${VK_ICD_FILENAMES:-/etc/vulkan/icd.d/maleoon_vulkan.json}"
+
+exec "$@"
