@@ -1,0 +1,13 @@
+[Desktop Entry]
+Type=Application
+Name=麒麟 GPU 兼容控制器
+Name[en_US]=Kylin GPU Control
+Name[zh_CN]=麒麟 GPU 兼容控制器
+Comment=管理指定 GLX 应用的 Mesa Zink 硬件加速白名单
+Comment[en_US]=Manage Mesa Zink compatibility entries for selected GLX applications
+Comment[zh_CN]=管理指定 GLX 应用的 Mesa Zink 硬件加速白名单
+Exec=/usr/local/bin/kylin-gpu-control
+Icon=kylin-gpu-control
+Terminal=false
+Categories=Settings;HardwareSettings;
+StartupNotify=true

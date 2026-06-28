@@ -32,6 +32,8 @@
 
 本工具集通过**精简 KWin 特效**、**优化合成器参数**和**运行时脚本**三管齐下，显著提升桌面流畅度。
 
+仓库现在还包含一个中文 GUI：**麒麟 GPU 兼容控制器**。它用于管理指定 GLX/OpenGL 应用的 Mesa Zink 白名单，并把 KWin 桌面优化状态整合到同一个窗口里。
+
 ---
 
 ## ⚡ 优化内容
@@ -62,6 +64,14 @@ bash ~/桌面/kwin-optimize.sh
 
 登录后自动执行优化脚本，确保每次启动都生效。
 
+### 麒麟 GPU 兼容控制器
+
+- 读取系统 `.desktop` 启动器，支持按中文应用名搜索并自动提取实际命令
+- 管理 `/etc/drirc` 中的 Zink 白名单，避免全局替换 OpenGL/GLX 系统库
+- 通过 `/usr/local/bin/kylin-zink-run` 按需启动应用
+- 显示 `glxinfo -B`、KWin 合成器、活跃特效、当前显示模式等状态
+- 提供“桌面流畅优化”按钮，复用本仓库的 KWin 优化策略，但不会强行切换 120Hz
+
 ---
 
 ## 📁 文件说明
@@ -70,9 +80,13 @@ bash ~/桌面/kwin-optimize.sh
 kylin-optimize/
 ├── README.md                     ← 本文件
 ├── KWIN-OPTIMIZE-GUIDE.md        ← 详细优化指南（八章）
+├── install-gpu-control.sh         ← 安装 GUI 控制器
 ├── ukui-kwinrc-optimized         ← 优化后的 KWin 配置文件（参考）
 ├── kwin-optimize.sh              ← 运行时特效卸载脚本
 ├── kwin-optimize.desktop         ← autostart 桌面入口
+├── src/kylin_gpu_control/        ← GUI 控制器源码
+├── packaging/                    ← desktop、polkit、图标、启动器
+├── tests/                        ← 单元测试
 └── .gitignore
 ```
 
@@ -82,6 +96,8 @@ kylin-optimize/
 | `ukui-kwinrc-optimized` | 配置参考 | 可直接替换 `~/.config/ukui-kwinrc` |
 | `kwin-optimize.sh` | 脚本 | 运行时通过 dbus 卸载特效 |
 | `kwin-optimize.desktop` | 自启 | 复制到 `~/.config/autostart/` 实现开机自启 |
+| `install-gpu-control.sh` | 安装脚本 | 安装中文 GUI、polkit helper、desktop 入口和图标 |
+| `src/kylin_gpu_control/` | Python 源码 | GLX/Zink 白名单、应用目录、KWin 状态与 GUI |
 
 ---
 
@@ -119,6 +135,25 @@ sudo -u kylin DISPLAY=:0 DBUS_SESSION_BUS_ADDRESS="$DBUS" \
 ### 方法二：手动操作
 
 参考 [`KWIN-OPTIMIZE-GUIDE.md`](KWIN-OPTIMIZE-GUIDE.md) 第四章的详细步骤。
+
+### 方法三：安装中文 GUI 控制器
+
+```bash
+sudo ./install-gpu-control.sh
+```
+
+安装后从开始菜单搜索 **麒麟 GPU 兼容控制器**。推荐测试顺序：
+
+```bash
+sudo apt install glmark2 mesa-utils
+```
+
+在 GUI 中搜索 `glmark2`，加入 Zink 白名单后通过 Zink 启动。状态栏中应看到：
+
+```text
+OpenGL renderer string: zink (Maleoon 910)
+Accelerated: yes
+```
 
 ---
 
