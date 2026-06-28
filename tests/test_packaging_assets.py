@@ -24,8 +24,10 @@ class PackagingAssetTests(unittest.TestCase):
 
         for expected in [
             "app_catalog.py",
+            "ai_model.py",
             "drirc_model.py",
             "kwin_model.py",
+            "perf_model.py",
             "kylin_gpu_control.py",
             "kylin_gpu_control_apply.py",
             "kylin-zink-run",
@@ -50,6 +52,9 @@ class PackagingAssetTests(unittest.TestCase):
             "GLX 状态",
             "桌面优化",
             "屏幕刷新率",
+            "CPU 性能",
+            "麒麟 AI 精简",
+            "默认前台加速",
             "已安装应用",
             "Zink 白名单",
             "通过 Zink 启动",
@@ -73,6 +78,19 @@ class PackagingAssetTests(unittest.TestCase):
         readme = (ROOT / "README.md").read_text(encoding="utf-8")
 
         self.assertIn("| 依赖 | Python 3、PyQt5、mesa-utils、policykit、kscreen-doctor |", readme)
+
+    def test_readme_documents_cpu_and_ai_controls(self):
+        readme = (ROOT / "README.md").read_text(encoding="utf-8")
+
+        for expected in [
+            "CPU 性能",
+            "默认前台加速",
+            "实时调度",
+            "麒麟 AI 精简",
+            "不卸载软件包",
+        ]:
+            with self.subTest(expected=expected):
+                self.assertIn(expected, readme)
 
     def test_release_packaging_script_includes_gui_controller_assets(self):
         text = (ROOT / "scripts" / "package-release.sh").read_text(encoding="utf-8")

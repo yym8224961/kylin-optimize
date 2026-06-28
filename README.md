@@ -22,6 +22,8 @@
 - 显示 `glxinfo -B`、OpenGL renderer、KWin 合成器、活跃特效和当前显示模式。
 - 内置“桌面流畅优化”按钮，复用本仓库的 KWin 优化策略。
 - 内置“屏幕刷新率”控制，可在支持的同分辨率模式间切换 60Hz / 120Hz。
+- 内置“CPU 性能”控制，默认前台加速会把通过 GUI 启动的应用绑定到 Kirin 9000C 的中核+大核（CPU 4-11）。
+- 内置“麒麟 AI 精简”控制，可禁用 Kylin AI 文档问答、Milvus Lite、Triton 和 AI Runtime 的当前会话/自启，且不卸载软件包、不删除模型和用户数据。
 
 ### KWin 桌面优化
 
@@ -42,6 +44,7 @@
 - 不替换系统全局 `libGL`、`libEGL`、`libGLX`。
 - 不改系统动态链接器全局配置。
 - 不把所有应用强制切到 Zink。
+- 不把普通桌面应用默认切到实时调度。
 
 GPU 控制器采用白名单方式：只有写入 `/etc/drirc` 的应用才会使用 Zink 路径。
 
@@ -88,6 +91,12 @@ sudo ./install-gpu-control.sh
 5. 在“GLX 状态”区域确认 renderer。
 
 如果机器的面板支持 120Hz，可以在“屏幕刷新率”区域点击“切换到 120Hz”。该操作会先通过 `kscreen-doctor` 做运行时切换，再把 `~/.config/ukui-kwinrc` 中对应输出的 `Mode=` 持久化为 120Hz，并自动生成 `.bak.*` 备份。需要回退时点击“切换回 60Hz”。
+
+“CPU 性能”区域默认勾选“默认前台加速”。开启后，通过 GUI 的“通过 Zink 启动”按钮启动的应用会使用 `taskset -c 4-11`，优先使用 Kirin 9000C 的中核和大核。这个模式不使用实时调度；`SCHED_FIFO` / `SCHED_RR` 这类实时策略可能让 KWin、输入、音频等桌面关键线程抢不到 CPU，不适合作为默认桌面优化。
+
+“后台降噪”会尝试对 Kylin AI、KMRE、华为电脑管家、更新与搜索等当前用户后台进程降低 CPU/IO 优先级。失败项会被忽略，不会终止进程。
+
+“麒麟 AI 精简”会停止并禁用当前用户的 Kylin AI 文档问答服务、文档服务、Milvus Lite，并通过 `~/.config/autostart/` 覆盖 Triton Server 与 Kylin AI Runtime 自启。该操作不卸载软件包，不删除 `/usr/share/kylin-ai` 模型，也不删除 `~/.local/share/milvus-lite` 数据；点击“恢复 Kylin AI”可恢复用户服务和登录自启。当前 UKUI 会话可能会复活已经注册的 Kylin AI Runtime，重新登录后精简状态会完全生效。
 
 期望看到类似输出：
 
@@ -179,15 +188,19 @@ kylin-optimize/
 │   ├── kylin-zink-run
 │   └── org.kylin.gpu-control.policy
 ├── src/kylin_gpu_control/
+│   ├── ai_model.py
 │   ├── app_catalog.py
 │   ├── drirc_model.py
 │   ├── kwin_model.py
 │   ├── kylin_gpu_control.py
-│   └── kylin_gpu_control_apply.py
+│   ├── kylin_gpu_control_apply.py
+│   └── perf_model.py
 └── tests/
+    ├── test_ai_model.py
     ├── test_app_catalog.py
     ├── test_apply_helper.py
     ├── test_drirc_model.py
+    ├── test_perf_model.py
     ├── test_kwin_model.py
     └── test_packaging_assets.py
 ```
@@ -196,9 +209,11 @@ kylin-optimize/
 
 ```bash
 python3 -m unittest \
+  tests.test_ai_model \
   tests.test_app_catalog \
   tests.test_apply_helper \
   tests.test_drirc_model \
+  tests.test_perf_model \
   tests.test_kwin_model \
   tests.test_packaging_assets
 

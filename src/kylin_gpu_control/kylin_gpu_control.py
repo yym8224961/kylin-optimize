@@ -8,6 +8,7 @@ from PyQt5.QtCore import Qt
 from PyQt5.QtGui import QIcon
 from PyQt5.QtWidgets import (
     QApplication,
+    QCheckBox,
     QFileDialog,
     QGridLayout,
     QGroupBox,
@@ -25,13 +26,17 @@ from PyQt5.QtWidgets import (
 )
 
 try:
+    from . import ai_model
     from . import app_catalog
     from . import drirc_model
     from . import kwin_model
+    from . import perf_model
 except ImportError:
+    import ai_model
     import app_catalog
     import drirc_model
     import kwin_model
+    import perf_model
 
 
 LOCAL_DRIRC = Path("/etc/drirc")
@@ -46,7 +51,7 @@ class MainWindow(QMainWindow):
         self.app_entries = []
         self.setWindowTitle("麒麟 GPU 兼容控制器")
         self.setWindowIcon(QIcon.fromTheme("kylin-gpu-control"))
-        self.resize(940, 860)
+        self.resize(980, 1040)
         self._build_ui()
         self.refresh_app_catalog()
         self.refresh_all()
@@ -103,6 +108,40 @@ class MainWindow(QMainWindow):
         refresh_buttons.addStretch(1)
         refresh_layout.addLayout(refresh_buttons)
 
+        cpu_box = QGroupBox("CPU 性能")
+        cpu_layout = QVBoxLayout(cpu_box)
+        self.cpu_status_label = QLabel("")
+        self.cpu_status_label.setWordWrap(True)
+        cpu_layout.addWidget(self.cpu_status_label)
+        self.foreground_boost_checkbox = QCheckBox("默认前台加速（绑定中核+大核 4-11，不使用实时调度）")
+        self.foreground_boost_checkbox.setChecked(True)
+        cpu_layout.addWidget(self.foreground_boost_checkbox)
+
+        cpu_buttons = QHBoxLayout()
+        self.cpu_refresh_button = QPushButton("刷新 CPU 状态")
+        self.background_noise_button = QPushButton("后台降噪")
+        cpu_buttons.addWidget(self.cpu_refresh_button)
+        cpu_buttons.addWidget(self.background_noise_button)
+        cpu_buttons.addStretch(1)
+        cpu_layout.addLayout(cpu_buttons)
+
+        ai_box = QGroupBox("麒麟 AI 精简")
+        ai_layout = QVBoxLayout(ai_box)
+        self.ai_status_output = QTextEdit()
+        self.ai_status_output.setReadOnly(True)
+        self.ai_status_output.setMaximumHeight(120)
+        ai_layout.addWidget(self.ai_status_output)
+
+        ai_buttons = QHBoxLayout()
+        self.ai_refresh_button = QPushButton("刷新 AI 状态")
+        self.ai_disable_button = QPushButton("禁用 Kylin AI 自启")
+        self.ai_restore_button = QPushButton("恢复 Kylin AI")
+        ai_buttons.addWidget(self.ai_refresh_button)
+        ai_buttons.addWidget(self.ai_disable_button)
+        ai_buttons.addWidget(self.ai_restore_button)
+        ai_buttons.addStretch(1)
+        ai_layout.addLayout(ai_buttons)
+
         app_box = QGroupBox("已安装应用")
         app_layout = QGridLayout(app_box)
         app_layout.addWidget(QLabel("搜索："), 0, 0)
@@ -153,6 +192,8 @@ class MainWindow(QMainWindow):
         layout.addWidget(status_box, 2)
         layout.addWidget(desktop_box, 1)
         layout.addWidget(refresh_box, 1)
+        layout.addWidget(cpu_box, 1)
+        layout.addWidget(ai_box, 1)
         layout.addWidget(app_box, 3)
         layout.addWidget(whitelist_box, 1)
         self.setCentralWidget(root)
@@ -165,6 +206,11 @@ class MainWindow(QMainWindow):
         self.refresh_rate_refresh_button.clicked.connect(self.refresh_screen_status)
         self.refresh_rate_120_button.clicked.connect(lambda: self.set_screen_refresh_rate(120))
         self.refresh_rate_60_button.clicked.connect(lambda: self.set_screen_refresh_rate(60))
+        self.cpu_refresh_button.clicked.connect(self.refresh_cpu_status)
+        self.background_noise_button.clicked.connect(self.apply_background_noise_reduction)
+        self.ai_refresh_button.clicked.connect(self.refresh_ai_status)
+        self.ai_disable_button.clicked.connect(self.disable_kylin_ai)
+        self.ai_restore_button.clicked.connect(self.restore_kylin_ai)
         self.reload_apps_button.clicked.connect(self.refresh_app_catalog)
         self.use_app_button.clicked.connect(self.use_selected_app)
         self.add_app_button.clicked.connect(self.add_selected_app)
@@ -183,6 +229,8 @@ class MainWindow(QMainWindow):
         self.refresh_vendor_label()
         self.refresh_desktop_status()
         self.refresh_screen_status()
+        self.refresh_cpu_status()
+        self.refresh_ai_status()
         self.run_glx_probe()
 
     def refresh_app_catalog(self):
@@ -289,6 +337,39 @@ class MainWindow(QMainWindow):
         self.refresh_screen_status()
         self.refresh_desktop_status()
 
+    def refresh_cpu_status(self):
+        self.cpu_status_label.setText(perf_model.cpu_layout_text() + "\n\n" + perf_model.background_status_text())
+
+    def apply_background_noise_reduction(self):
+        changed = perf_model.lower_background_noise()
+        QMessageBox.information(self, "CPU 性能", f"已尝试降低 {len(changed)} 个后台进程的调度优先级。")
+        self.refresh_cpu_status()
+
+    def refresh_ai_status(self):
+        self.ai_status_output.setPlainText(ai_model.status_text())
+
+    def disable_kylin_ai(self):
+        result = ai_model.disable_ai()
+        if result.returncode != 0:
+            QMessageBox.critical(self, "麒麟 AI 精简失败", (result.stderr or result.stdout).strip())
+            return
+        QMessageBox.information(
+            self,
+            "麒麟 AI 精简",
+            "已禁用 Kylin AI 自启并停止文档问答、文档服务和 Milvus Lite。"
+            "\nKylin AI Runtime 可能被当前 UKUI 会话复活，重新登录后会完全生效。"
+            "\n软件包和数据未删除。",
+        )
+        self.refresh_ai_status()
+
+    def restore_kylin_ai(self):
+        result = ai_model.restore_ai()
+        if result.returncode != 0:
+            QMessageBox.critical(self, "恢复 Kylin AI 失败", (result.stderr or result.stdout).strip())
+            return
+        QMessageBox.information(self, "麒麟 AI 精简", "已恢复 Kylin AI 用户服务。Triton 与运行时会在下次登录按系统自启恢复。")
+        self.refresh_ai_status()
+
     def run_glx_probe(self):
         env = os.environ.copy()
         env.setdefault("DISPLAY", ":0")
@@ -336,7 +417,10 @@ class MainWindow(QMainWindow):
         env.setdefault("DISPLAY", ":0")
         env.setdefault("XDG_RUNTIME_DIR", "/run/user/1000")
         try:
-            subprocess.Popen([str(ZINK_RUN), executable], env=env)
+            command = [str(ZINK_RUN), executable]
+            if self.foreground_boost_checkbox.isChecked():
+                command, _accelerated = perf_model.resolve_launch_command(command)
+            subprocess.Popen(command, env=env)
         except Exception as exc:
             QMessageBox.critical(self, "启动失败", str(exc))
 
